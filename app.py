@@ -1,6 +1,7 @@
 """Interface web (Streamlit). Para rodar: streamlit run app.py"""
 import streamlit as st
 
+from nucleo.conteudo import DADOS, ETAPAS_BIRO, HABITOS, LEITURA_DOS_DADOS, PESOS_SCORE
 from nucleo.dividas import parcela_price, simular_divida, taxa_implicita
 from nucleo.orcamento import (comprometimento, folga_mensal, orcamento_50_30_20,
                               renda_base, reserva_alvo)
@@ -14,7 +15,8 @@ def real(v):
     return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
-aba1, aba2, aba3 = st.tabs(["Simulador de dívida", "Avaliar oferta de crédito", "Meu orçamento"])
+aba1, aba2, aba3, aba4, aba5 = st.tabs(["Simulador de dívida", "Avaliar oferta de crédito", "Meu orçamento",
+                                      "Birôs e score", "Dados e justificativa"])
 
 with aba1:
     st.subheader("Como uma dívida cresce (ou não)")
@@ -79,3 +81,25 @@ with aba3:
             f = folga_mensal(base, essenciais, parcelas)
             (st.success if f >= 0 else st.error)(f"Folga mensal no pior cenário: {real(f)}")
             st.write(f"Reserva-alvo: {real(reserva_alvo(essenciais, meses_reserva))}.")
+
+with aba4:
+    st.subheader("Como os birôs de crédito e o score funcionam")
+    for k, etapa in enumerate(ETAPAS_BIRO, 1):
+        st.write(f"**{k}.** {etapa}")
+    st.markdown("**O que mais pesa no Serasa Score (%)**")
+    st.bar_chart(PESOS_SCORE)
+    st.caption("Fonte: Serasa, página Mitos e verdades sobre o Serasa Score. Os pesos mudam com o modelo.")
+    st.markdown("**Teste um hábito**")
+    escolha = st.selectbox("O que você faria?", list(HABITOS))
+    efeito, texto = HABITOS[escolha]
+    {"sobe": st.success, "desce": st.error, "neutro": st.info}[efeito](
+        {"sobe": "Tende a ajudar. ", "desce": "Tende a prejudicar. ", "neutro": "Não muda o score. "}[efeito] + texto)
+    st.warning("O score mede a chance de você pagar, não se o crédito é bom para você. "
+               "Uma oferta aprovada não significa que a parcela cabe na sua pior renda do mês.")
+
+with aba5:
+    st.subheader("Por que este projeto importa")
+    st.dataframe([{"Indicador": a, "Valor": b, "Fonte": c, "Período": d} for a, b, c, d in DADOS],
+                 hide_index=True)
+    st.info(LEITURA_DOS_DADOS)
+    st.caption("Dados consultados em outubro de 2026. Confira nas fontes primárias antes de citar.")

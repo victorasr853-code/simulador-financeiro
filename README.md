@@ -19,7 +19,8 @@ python -m unittest discover -s testes -v
 - `nucleo/dividas.py`: simulação da dívida mês a mês, Tabela Price e taxa implícita da oferta.
 - `nucleo/orcamento.py`: renda base, regra 50/30/20, reserva, comprometimento e folga.
 - `testes/`: testes automatizados do núcleo (usar no capítulo de testes do TCC).
-- `app.py`: telas (simulador, avaliador de oferta, orçamento).
+- `nucleo/conteudo.py`: dados com fonte e conteúdo educativo (birôs, score, hábitos).
+- `app.py`: telas (simulador, oferta, orçamento, birôs e score, dados e justificativa).
 
 ## Próximos passos
 1. Trocar as taxas de exemplo pelas médias do Banco Central (com a data).

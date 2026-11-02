@@ -3,8 +3,9 @@ import streamlit as st
 
 from nucleo.conteudo import DADOS, ETAPAS_BIRO, HABITOS, LEITURA_DOS_DADOS, PESOS_SCORE
 from nucleo.dividas import parcela_price, simular_divida, taxa_implicita
-from nucleo.orcamento import (comprometimento, folga_mensal, orcamento_50_30_20,
-                              renda_base, reserva_alvo)
+from nucleo.orcamento import (cascata, comprometimento, diagnostico_renda, folga_mensal,
+                              meses_para_atingir, meses_reserva_sugeridos, orcamento_50_30_20,
+                              renda_base, reserva_alvo, retirada_maxima, simular_colchao)
 
 st.set_page_config(page_title="Simulador de dívidas e orçamento", page_icon="💰")
 st.title("Simulador de dívidas e orçamento")
@@ -57,30 +58,108 @@ with aba2:
         c2.metric("Só de juros", real(total - valor))
         st.info("Olhe o total pago, não só se a parcela cabe no bolso.")
 
-with aba3:
-    st.subheader("Orçamento para renda que varia")
-    meses = st.text_input("Sua renda nos últimos 6 meses (separe por vírgula)", "1500, 2400, 900, 2000, 1200, 1800")
-    essenciais = st.number_input("Despesas essenciais por mês (R$)", min_value=0.0, value=1100.0, step=50.0)
+def tela_orcamento():
+    st.subheader("Orçamento para quem tem renda que varia")
+    st.caption("Sem salário fixo, a regra 50/30/20 sozinha não basta: o que muda é como definir "
+               "a renda do mês e como guardar nos meses bons para cobrir os ruins.")
+    meses_txt = st.text_input("Quanto você recebeu em cada um dos últimos meses? (separe por vírgula; ideal: 6 a 12 meses)",
+                              "1500, 2400, 900, 2000, 1200, 1800")
+    custos = st.number_input("Custos do trabalho por mês, se houver (material, transporte, taxas) (R$)",
+                             min_value=0.0, value=0.0, step=50.0)
+    essenciais = st.number_input("Despesas essenciais por mês: moradia, comida, contas, transporte (R$)",
+                                 min_value=0.0, value=1100.0, step=50.0)
     parcelas = st.number_input("Total de parcelas que você paga por mês (R$)", min_value=0.0, value=200.0, step=50.0)
-    meses_reserva = st.slider("Meses de reserva que você quer ter", 3, 12, 6)
-    if st.button("Calcular orçamento", key="orc"):
-        try:
-            rendas = [float(x.replace(",", ".")) for x in meses.replace(";", ",").split(",") if x.strip()]
-            base = renda_base(rendas)
-        except ValueError:
-            st.error("Digite só números, separados por vírgula (use ponto nos centavos).")
+
+    try:
+        brutas = [float(x.replace(",", ".")) for x in meses_txt.replace(";", ",").split(",") if x.strip()]
+        rendas = [r - custos for r in brutas]
+        dg = diagnostico_renda(rendas)
+    except ValueError:
+        st.error("Digite pelo menos 2 meses, só números, separados por vírgula (use ponto nos centavos).")
+        return
+
+    etapa = st.radio("O que você quer ver?", ["1. Diagnóstico da renda", "2. Meu salário fixo",
+                                              "3. Cascata de prioridades", "4. Reserva e proteção"])
+
+    if etapa.startswith("1"):
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Média por mês", real(dg["media"]))
+        c2.metric("Pior mês", real(dg["minimo"]))
+        c3.metric("Melhor mês", real(dg["maximo"]))
+        st.write(f"Oscilação da renda: **{dg['nivel']}** (variação de {dg['variacao'] * 100:.0f}% em torno da média).")
+        st.bar_chart(rendas)
+        if dg["nivel"] != "estável":
+            st.warning("Orçar pela média pode falhar nos meses fracos. Veja a aba 2, que mostra como transformar "
+                       "uma renda que oscila em um valor fixo por mês.")
+        base = renda_base(rendas)
+        o = orcamento_50_30_20(base)
+        st.write(f"Se você usar a regra 50/30/20 sobre a renda base ({real(base)}, média dos 3 piores meses): "
+                 f"necessidades {real(o['necessidades'])}, desejos {real(o['desejos'])}, "
+                 f"reserva e dívidas {real(o['reserva_e_dividas'])}.")
+        comp = comprometimento(parcelas, base)
+        st.write(f"As parcelas comprometem {comp * 100:.0f}% da renda base.")
+        if comp > 0.30:
+            st.warning("Acima de 30% da renda base (limite de referência, ajuste e cite a fonte).")
+
+    elif etapa.startswith("2"):
+        st.write("A ideia é **pagar a si mesmo um valor fixo todo mês**. Nos meses bons, o que sobra vai para um "
+                 "colchão. Nos meses ruins, você usa o colchão e o valor continua o mesmo.")
+        maxima = retirada_maxima(rendas)
+        st.info(f"Com esse histórico, o maior valor fixo que você conseguiria retirar sem faltar em nenhum mês, "
+                f"começando sem colchão, é **{real(maxima)}**.")
+        retirada = st.number_input("Quanto você quer retirar por mês (R$)", min_value=0.0,
+                                   value=float(int(maxima)), step=50.0)
+        colchao0 = st.number_input("Colchão que você já tem hoje (R$)", min_value=0.0, value=0.0, step=100.0)
+        r = simular_colchao(rendas, retirada, colchao0)
+        st.line_chart(r["historico"])
+        st.caption("Saldo do colchão ao final de cada mês.")
+        if r["sustenta"]:
+            st.success("Com esse valor fixo, o dinheiro não faltou em nenhum mês do histórico.")
         else:
-            st.metric("Renda base (média dos 3 piores meses)", real(base))
-            o = orcamento_50_30_20(base)
-            st.write(f"Regra 50/30/20: necessidades {real(o['necessidades'])}, "
-                     f"desejos {real(o['desejos'])}, reserva e dívidas {real(o['reserva_e_dividas'])}.")
-            comp = comprometimento(parcelas, base)
-            st.write(f"Parcelas comprometem {comp * 100:.0f}% da renda base.")
-            if comp > 0.30:
-                st.warning("Acima de 30% da renda base (limite de referência, ajuste e cite a fonte).")
-            f = folga_mensal(base, essenciais, parcelas)
-            (st.success if f >= 0 else st.error)(f"Folga mensal no pior cenário: {real(f)}")
-            st.write(f"Reserva-alvo: {real(reserva_alvo(essenciais, meses_reserva))}.")
+            st.error(f"Faltou dinheiro em {r['meses_faltou']} mês(es), num total de {real(r['total_faltou'])}. "
+                     "Reduza a retirada ou monte um colchão antes.")
+        if retirada < essenciais:
+            st.warning("Esse valor fixo é menor que suas despesas essenciais.")
+
+    elif etapa.startswith("3"):
+        st.write("Em vez de porcentagens fixas, o dinheiro que entra é distribuído **por ordem de prioridade**: "
+                 "primeiro o essencial, depois as parcelas, depois a reserva, e só então o resto.")
+        mes = st.number_input("Quanto entrou neste mês (R$)", min_value=0.0, value=float(max(dg["minimo"], 0)), step=50.0)
+        reserva_mes = st.number_input("Quanto quer guardar por mês na reserva (R$)", min_value=0.0, value=100.0, step=50.0)
+        c = cascata(mes, essenciais, parcelas, reserva_mes)
+        st.write(f"1. Essenciais: {real(c['essenciais'])}")
+        st.write(f"2. Parcelas: {real(c['parcelas'])}")
+        st.write(f"3. Reserva: {real(c['reserva'])}")
+        st.write(f"4. Livre para o resto: {real(c['livre'])}")
+        if c["falta_essenciais"] > 0:
+            st.error(f"Neste mês faltam {real(c['falta_essenciais'])} para cobrir o essencial. "
+                     "Evite cobrir o buraco com rotativo ou cheque especial (veja a aba do simulador de dívida).")
+        elif c["falta_parcelas"] > 0:
+            st.warning(f"Faltam {real(c['falta_parcelas'])} para pagar as parcelas.")
+        if mes > 0:
+            st.caption(f"Neste mês, o essencial pesa {essenciais / mes * 100:.0f}% da renda. "
+                       "Na regra 50/30/20, ele seria limitado a 50%.")
+
+    else:
+        meses_sug = meses_reserva_sugeridos(dg["nivel"])
+        meses_res = st.slider("Meses de despesas essenciais que você quer ter guardados", 3, 12, meses_sug)
+        meta = reserva_alvo(essenciais, meses_res)
+        st.metric("Meta da reserva", real(meta))
+        st.caption("Guias de educação financeira costumam indicar de 6 a 12 meses para renda variável, "
+                   "contra 3 a 6 para quem tem salário fixo. Cite fontes oficiais no TCC.")
+        aporte = st.number_input("Quanto você consegue guardar por mês (R$)", min_value=0.0, value=100.0, step=50.0)
+        n = meses_para_atingir(meta, aporte)
+        st.write("Guardando esse valor, você leva " + (f"cerca de {n} meses." if n else "um tempo indeterminado (aporte zero)."))
+        st.markdown("**Outros cuidados para quem trabalha por conta própria**")
+        st.write("- Separe o dinheiro da casa do dinheiro do trabalho.")
+        st.write("- Reserve uma parte de cada recebimento antes de gastar (reserva e previdência).")
+        st.write("- Sem contribuição à previdência, você fica sem proteção como auxílio por doença. "
+                 "No MEI, a contribuição previdenciária já vem incluída na guia mensal.")
+        st.write("- Fuja de crédito caro para cobrir mês fraco: use o simulador de dívida antes de contratar.")
+
+
+with aba3:
+    tela_orcamento()
 
 with aba4:
     st.subheader("Como os birôs de crédito e o score funcionam")

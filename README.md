@@ -17,7 +17,7 @@ python -m unittest discover -s testes -v
 
 ## Estrutura
 - `nucleo/dividas.py`: simulação da dívida mês a mês, Tabela Price e taxa implícita da oferta.
-- `nucleo/orcamento.py`: renda base, regra 50/30/20, reserva, comprometimento e folga.
+- `nucleo/orcamento.py`: renda base, regra 50/30/20, reserva, comprometimento, folga e, para renda variável, diagnóstico da renda, salário fixo com colchão, cascata de prioridades e prazo da reserva.
 - `testes/`: testes automatizados do núcleo (usar no capítulo de testes do TCC).
 - `nucleo/conteudo.py`: dados com fonte e conteúdo educativo (birôs, score, hábitos).
 - `app.py`: telas (simulador, oferta, orçamento, birôs e score, dados e justificativa).

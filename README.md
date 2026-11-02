@@ -1,4 +1,4 @@
-# Simulador de dívidas e orçamento (TCC)
+# Simulador de Bola de Neve (TCC)
 
 Projeto 100% em Python, com interface em Streamlit.
 
@@ -20,7 +20,8 @@ python -m unittest discover -s testes -v
 - `nucleo/orcamento.py`: renda base, regra 50/30/20, reserva, comprometimento, folga e, para renda variável, diagnóstico da renda, salário fixo com colchão, cascata de prioridades e prazo da reserva.
 - `testes/`: testes automatizados do núcleo (usar no capítulo de testes do TCC).
 - `nucleo/conteudo.py`: dados com fonte e conteúdo educativo (birôs, score, hábitos).
-- `app.py`: telas (simulador, oferta, orçamento, birôs e score, dados e justificativa).
+- `app.py`: telas do Simulador de Bola de Neve (dívida, oferta, orçamento, birôs e score, dados) e o visual da página.
+- `.streamlit/config.toml`: cores do tema (se essa pasta não subir para o GitHub, o app funciona igual, só com o tema padrão).
 
 ## Próximos passos
 1. Trocar as taxas de exemplo pelas médias do Banco Central (com a data).
